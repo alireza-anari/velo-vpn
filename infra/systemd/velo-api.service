@@ -1,0 +1,30 @@
+[Unit]
+Description=Velo API
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=velo
+Group=velo
+WorkingDirectory=/opt/velo/backend
+EnvironmentFile=/opt/velo/backend/.env
+ExecStartPre=/opt/velo/backend/.venv/bin/alembic -c /opt/velo/backend/alembic.ini upgrade head
+ExecStart=/opt/velo/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000 --workers 1
+Restart=always
+RestartSec=3
+# Local WireGuard mode uses narrowly-scoped sudoers entries for wg/tc helpers.
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/velo/backend/uploads
+UMask=0077
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+
+[Install]
+WantedBy=multi-user.target

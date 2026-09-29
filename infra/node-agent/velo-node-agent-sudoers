@@ -1,0 +1,3 @@
+# Install as /etc/sudoers.d/velo-node-agent and validate with visudo -cf.
+# This grants only the WireGuard helper commands required by the node agent.
+velo-agent ALL=(root) NOPASSWD: /opt/velo/wireguard/add_peer.sh *, /opt/velo/wireguard/remove_peer.sh *, /opt/velo/wireguard/shape_peer.sh *, /opt/velo/wireguard/unshape_peer.sh *, /usr/bin/wg show wg0, /usr/bin/wg show wg0 transfer, /usr/bin/wg show wg0 allowed-ips, /usr/bin/wg show wg0 latest-handshakes

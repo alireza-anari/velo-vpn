@@ -1,0 +1,10 @@
+.idea/
+.gradle/
+local.properties
+**/build/
+*.iml
+.env
+backend/uploads/*
+!backend/uploads/.gitkeep
+__pycache__/
+*.pyc

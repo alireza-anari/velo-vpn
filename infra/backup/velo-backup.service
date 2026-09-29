@@ -1,0 +1,18 @@
+[Unit]
+Description=Velo private local backup staging
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=velo
+Group=velo
+Environment=VELO_BACKUP_ENV=/etc/velo/backup.env
+ExecStart=/opt/velo/backup/backup.sh
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/backups/velo /opt/velo/backend/uploads
