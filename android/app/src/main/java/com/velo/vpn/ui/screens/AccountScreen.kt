@@ -51,7 +51,13 @@ fun AccountScreen(nav: NavHostController, vm: AccountViewModel) {
                         Column(Modifier.weight(1f)) {
                             Icon(Icons.Default.WorkspacePremium, null, tint = VeloPurple)
                             Text(if (state.subscriptionActive) "Premium فعال" else "پلن رایگان", fontWeight = FontWeight.Bold)
-                            if (state.subscriptionEndsAt != null) Text(state.subscriptionEndsAt.take(10), color = Muted, fontSize = 11.sp)
+                            state.subscriptionEndsAt?.let { endsAt ->
+                                Text(
+                                    endsAt.take(10),
+                                    color = Muted,
+                                    fontSize = 11.sp
+                                )
+                            }
                         }
                     }
                 }

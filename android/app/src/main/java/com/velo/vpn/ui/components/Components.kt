@@ -63,7 +63,11 @@ fun VeloCard(modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, conte
 }
 
 @Composable
-fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun PrimaryButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit
+) {
     Button(
         onClick = onClick,
         modifier = modifier.fillMaxWidth().height(55.dp),
@@ -73,7 +77,13 @@ fun PrimaryButton(text: String, onClick: () -> Unit, modifier: Modifier = Modifi
 }
 
 @Composable
-fun FeatureRow(icon: ImageVector, title: String, subtitle: String? = null, onClick: (() -> Unit)? = null, tint: Color = VeloPurple) {
+fun FeatureRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String? = null,
+    tint: Color = VeloPurple,
+    onClick: (() -> Unit)? = null
+) {
     VeloCard(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(42.dp).background(Lilac.copy(alpha=.55f), CircleShape), contentAlignment = Alignment.Center) { Icon(icon, null, tint = tint) }
