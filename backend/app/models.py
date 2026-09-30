@@ -243,3 +243,23 @@ class UserEntitlement(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+
+
+class WebVpnAccess(Base):
+    __tablename__ = "web_vpn_accesses"
+    __table_args__ = (
+        UniqueConstraint("server_id", "client_ip", name="uq_web_vpn_access_server_ip"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
+    server_id: Mapped[int] = mapped_column(ForeignKey("vpn_servers.id"), index=True)
+    client_public_key: Mapped[str] = mapped_column(String(80), unique=True, index=True)
+    client_ip: Mapped[str] = mapped_column(String(64), index=True)
+    peer_enabled: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    free_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    welcome_granted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    config_version: Mapped[int] = mapped_column(Integer, default=1)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now, onupdate=now)
