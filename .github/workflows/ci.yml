@@ -65,3 +65,29 @@ jobs:
         with:
           name: velo-debug-apk
           path: android/app/build/outputs/apk/debug/*.apk
+
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install web dependencies
+        working-directory: web
+        run: npm install --no-audit --no-fund
+
+      - name: Web typecheck
+        working-directory: web
+        run: npm run typecheck
+
+      - name: Web lint
+        working-directory: web
+        run: npm run lint
+
+      - name: Web production build
+        working-directory: web
+        run: npm run build
