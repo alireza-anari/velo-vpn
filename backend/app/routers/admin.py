@@ -161,26 +161,44 @@ def settings_put(key: str, value=Body(...), db: Session = Depends(get_db)):
 @router.get("/servers")
 def servers(db: Session = Depends(get_db)):
     rows = db.scalars(select(VpnServer).order_by(VpnServer.id.asc())).all()
-    return [
-        {
-            "id": s.id,
-            "name": s.name,
-            "country_code": s.country_code,
-            "city": s.city,
-            "endpoint": f"{s.endpoint_host}:{s.endpoint_port}",
-            "tier": s.tier,
-            "active": s.is_active,
-            "default": s.is_default,
-            "max_sessions": s.max_sessions,
-            "agent_configured": bool(s.agent_url),
-            "health_state": s.health_state,
-            "health_failures": s.health_failures,
-            "last_health_at": s.last_health_at,
-            "last_health_error": s.last_health_error,
-            "unhealthy_until": s.unhealthy_until,
-        }
-        for s in rows
-    ]
+    out = []
+    for server in rows:
+        active_sessions = int(db.scalar(
+            select(func.count(VpnSession.id)).where(
+                VpnSession.server_id == server.id,
+                VpnSession.status == "active",
+            )
+        ) or 0)
+        usage = db.execute(
+            select(
+                func.coalesce(func.sum(VpnSession.rx_bytes + VpnSession.tx_bytes), 0),
+                func.coalesce(func.sum(VpnSession.consumed_seconds), 0),
+            ).where(VpnSession.server_id == server.id)
+        ).one()
+        out.append({
+            "id": server.id,
+            "name": server.name,
+            "country_code": server.country_code,
+            "city": server.city,
+            "endpoint": f"{server.endpoint_host}:{server.endpoint_port}",
+            "client_cidr": server.client_cidr,
+            "tier": server.tier,
+            "active": server.is_active,
+            "default": server.is_default,
+            "max_sessions": server.max_sessions,
+            "active_sessions": active_sessions,
+            "utilization_percent": round((active_sessions / max(1, server.max_sessions)) * 100, 1),
+            "usage_bytes": int(usage[0] or 0),
+            "usage_seconds": int(usage[1] or 0),
+            "agent_configured": bool(server.agent_url),
+            "agent_url": server.agent_url,
+            "health_state": server.health_state,
+            "health_failures": server.health_failures,
+            "last_health_at": server.last_health_at,
+            "last_health_error": server.last_health_error,
+            "unhealthy_until": server.unhealthy_until,
+        })
+    return out
 
 
 @router.post("/servers")
