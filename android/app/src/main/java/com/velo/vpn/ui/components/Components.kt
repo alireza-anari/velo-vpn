@@ -25,7 +25,7 @@ import com.velo.vpn.ui.Routes
 import com.velo.vpn.ui.theme.*
 
 @Composable
-fun VeloHeader(showBack: Boolean = false, hearts: Int = 120, onBack: (() -> Unit)? = null) {
+fun VeloHeader(showBack: Boolean = false, hearts: Int = 0, onBack: (() -> Unit)? = null) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (showBack) {
@@ -40,13 +40,9 @@ fun VeloHeader(showBack: Boolean = false, hearts: Int = 120, onBack: (() -> Unit
             Spacer(Modifier.width(7.dp))
             Text("Velo", fontSize = 25.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.onBackground)
         }
-        Surface(shape = RoundedCornerShape(16.dp), color = Lilac.copy(alpha = .55f)) {
-            Row(Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Favorite, null, tint = HeartPink, modifier = Modifier.size(17.dp))
-                Spacer(Modifier.width(5.dp))
-                Text(hearts.toString(), fontWeight = FontWeight.Bold)
-            }
-        }
+        // Hearts are intentionally hidden in the Premium-first MVP.
+        // The parameter stays for backward compatibility with the dormant rewards screens.
+        Spacer(Modifier.width(1.dp))
     }
 }
 
@@ -99,10 +95,9 @@ fun FeatureRow(
 
 data class BottomItem(val route: String, val label: String, val icon: ImageVector)
 private val bottomItems = listOf(
-    BottomItem(Routes.Home, "خانه", Icons.Default.Home),
-    BottomItem(Routes.Gifts, "هدایا", Icons.Default.CardGiftcard),
-    BottomItem(Routes.Report, "گزارش", Icons.Default.BarChart),
-    BottomItem(Routes.Settings, "تنظیمات", Icons.Default.Settings),
+    BottomItem(Routes.Home, "اتصال", Icons.Default.PowerSettingsNew),
+    BottomItem(Routes.Report, "مصرف", Icons.Default.BarChart),
+    BottomItem(Routes.Account, "حساب", Icons.Default.Person),
 )
 
 @Composable
