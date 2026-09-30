@@ -1,0 +1,19 @@
+{
+  "name": "Velo",
+  "short_name": "Velo",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f7f5ff",
+  "theme_color": "#7c5cff",
+  "description": "مدیریت اشتراک و دسترسی Velo",
+  "icons": [
+    {
+      "src": "/velo-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
