@@ -2,10 +2,9 @@ package com.velo.vpn.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AllInclusive
-import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -43,19 +42,18 @@ fun PremiumScreen(nav: NavHostController, commerce: CommerceViewModel, account: 
 
     Scaffold { pad ->
         Column(
-            Modifier.fillMaxSize().padding(pad).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            Modifier.fillMaxSize().padding(pad).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            VeloHeader(showBack = true, hearts = accountState.hearts, onBack = { nav.popBackStack() })
+            VeloHeader(showBack = true, onBack = { nav.popBackStack() })
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.WorkspacePremium, null, tint = VeloPurple, modifier = Modifier.size(88.dp))
+                Icon(Icons.Default.WorkspacePremium, null, tint = VeloPurple, modifier = Modifier.size(80.dp))
             }
-            Text("پریمیوم", Modifier.align(Alignment.CenterHorizontally), fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
-            Text("تجربه‌ای سریع‌تر، بدون محدودیت و بدون تبلیغ", Modifier.align(Alignment.CenterHorizontally), color = Muted)
-            FeatureRow(Icons.Default.AllInclusive, "بدون محدودیت زمان", "اتصال بدون محدودیت")
+            Text("Velo Premium", Modifier.align(Alignment.CenterHorizontally), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+            Text("یک اشتراک، اتصال سریع و بدون محدودیت Velo", Modifier.align(Alignment.CenterHorizontally), color = Muted)
             FeatureRow(Icons.Default.Bolt, "سرعت کامل", "بدون محدودیت سرعت از سمت Velo")
-            FeatureRow(Icons.Default.Block, "بدون تبلیغ", "تجربه‌ای آرام و بدون مزاحمت")
-            FeatureRow(Icons.Default.Dns, "انتخاب سرور", "دسترسی به سرورهای Premium")
+            FeatureRow(Icons.Default.Schedule, "بدون محدودیت زمان", "تا پایان اعتبار اشتراک")
+            FeatureRow(Icons.Default.Dns, "انتخاب خودکار سرور", "Velo بهترین سرور در دسترس را انتخاب می‌کند")
 
             Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 plans.forEachIndexed { i, p ->
@@ -75,15 +73,10 @@ fun PremiumScreen(nav: NavHostController, commerce: CommerceViewModel, account: 
             }
             if (current.recommended) Text("پیشنهاد Velo", color = VeloPurple, fontSize = 11.sp, fontWeight = FontWeight.Bold)
 
-            PrimaryButton(if (accountState.loggedIn) "خرید اشتراک" else "ورود و خرید اشتراک") {
+            PrimaryButton(if (accountState.loggedIn) "ادامه خرید" else "ورود و خرید") {
                 if (!accountState.loggedIn) nav.navigate(Routes.Account)
                 else nav.navigate(Routes.payment("premium", current.code, price))
             }
-            Text(
-                "در مرحله پرداخت می‌توانید با قلب‌ها تا سقف ${config?.maxHeartDiscountPercent ?: 30}٪ تخفیف بگیرید.",
-                color = Muted,
-                fontSize = 11.sp,
-            )
         }
     }
 }
