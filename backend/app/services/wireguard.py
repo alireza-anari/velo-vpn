@@ -14,7 +14,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..config import settings
-from ..models import VpnServer, VpnSession
+from ..models import VpnServer, VpnSession, WebVpnAccess
 from .time_utils import as_utc, utcnow
 
 _WG_KEY_RE = re.compile(r"^[A-Za-z0-9+/]{43}=$")
@@ -274,6 +274,13 @@ def allocate_client_ip(db: Session, server: VpnServer) -> str:
             )
         ).all()
     )
+    # Web configs keep their assigned address while temporarily disabled so the
+    # same downloaded config can be reactivated after a reward or subscription.
+    active_ips.update(
+        db.scalars(
+            select(WebVpnAccess.client_ip).where(WebVpnAccess.server_id == server.id)
+        ).all()
+    )
 
     # First usable IP is reserved for wg0 server itself. Start from the second host.
     hosts = list(network.hosts())
@@ -285,7 +292,7 @@ def allocate_client_ip(db: Session, server: VpnServer) -> str:
 
 
 def active_session_count(db: Session, server_id: int) -> int:
-    return int(
+    mobile = int(
         db.scalar(
             select(func.count(VpnSession.id)).where(
                 VpnSession.server_id == server_id,
@@ -294,6 +301,16 @@ def active_session_count(db: Session, server_id: int) -> int:
         )
         or 0
     )
+    web = int(
+        db.scalar(
+            select(func.count(WebVpnAccess.id)).where(
+                WebVpnAccess.server_id == server_id,
+                WebVpnAccess.peer_enabled == True,  # noqa: E712
+            )
+        )
+        or 0
+    )
+    return mobile + web
 
 
 def _circuit_open(server: VpnServer) -> bool:
@@ -375,10 +392,18 @@ def reconcile_server_peers(db: Session, server: VpnServer) -> dict:
         return {"server_id": server.id, "skipped": True, "removed_orphans": 0, "missing_sessions": 0}
 
     actual = list_peers(server)
-    active = db.scalars(
+    active_sessions = db.scalars(
         select(VpnSession).where(VpnSession.server_id == server.id, VpnSession.status == "active")
     ).all()
-    expected = {row.client_public_key: row for row in active}
+    active_web = db.scalars(
+        select(WebVpnAccess).where(
+            WebVpnAccess.server_id == server.id,
+            WebVpnAccess.peer_enabled == True,  # noqa: E712
+        )
+    ).all()
+    expected_sessions = {row.client_public_key: row for row in active_sessions}
+    expected_web = {row.client_public_key: row for row in active_web}
+    expected_keys = set(expected_sessions) | set(expected_web)
     actual_keys: set[str] = set()
     removed = 0
 
@@ -390,24 +415,34 @@ def reconcile_server_peers(db: Session, server: VpnServer) -> dict:
         if managed_ip is None:
             continue
         actual_keys.add(key)
-        if key not in expected:
+        if key not in expected_keys:
             remove_peer(server, key, managed_ip)
             removed += 1
 
-    missing = 0
-    for key, session in expected.items():
+    missing_sessions = 0
+    for key, session in expected_sessions.items():
         if key not in actual_keys:
             session.reconnect_required = True
-            missing += 1
-    if missing:
+            missing_sessions += 1
+
+    missing_web = 0
+    for key, access in expected_web.items():
+        if key not in actual_keys:
+            access.peer_enabled = False
+            access.last_error = "peer_missing_on_node"
+            missing_web += 1
+
+    if missing_sessions or missing_web:
         db.commit()
     return {
         "server_id": server.id,
         "skipped": False,
         "removed_orphans": removed,
-        "missing_sessions": missing,
+        "missing_sessions": missing_sessions,
+        "missing_web_accesses": missing_web,
         "actual_managed_peers": len(actual_keys),
-        "expected_sessions": len(expected),
+        "expected_sessions": len(expected_sessions),
+        "expected_web_accesses": len(expected_web),
     }
 
 

@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     ad_reward_minutes: int = 20
     max_heart_discount_percent: int = 30
 
+    # Web VPN access. Free credit extends a persistent WireGuard peer until this window expires.
+    web_welcome_minutes: int = 15
+    web_access_sync_interval_seconds: int = 15
+
     # Tapsell. The app key is build-time in Android Mediation; zone id is remote-configured.
     # tapsell_app_key remains for backward compatibility with early test builds.
     tapsell_app_key: str = ""

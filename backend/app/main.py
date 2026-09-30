@@ -12,8 +12,9 @@ from .config import settings
 from .db import Base, SessionLocal, engine
 from .migrations import run_lightweight_migrations
 from .observability import background_error, configure_logging, install_observability
-from .routers import admin, admin_web, auth, config, legal, marketing, missions, payments, referrals, reports, rewards, store, users, vpn
+from .routers import admin, admin_web, auth, config, legal, marketing, missions, payments, referrals, reports, rewards, store, users, vpn, web_vpn
 from .services.vpn import bootstrap_server, expire_due_sessions
+from .services.web_vpn import sync_all_accesses
 from .services.wireguard import check_all_servers, reconcile_all_servers
 
 configure_logging()
@@ -47,6 +48,21 @@ async def _session_reaper(stop: asyncio.Event) -> None:
             log.exception("session reaper failed")
         try:
             await asyncio.wait_for(stop.wait(), timeout=15)
+        except asyncio.TimeoutError:
+            pass
+
+
+async def _web_access_sync(stop: asyncio.Event) -> None:
+    delay = max(10, int(settings.web_access_sync_interval_seconds))
+    while not stop.is_set():
+        try:
+            with SessionLocal() as db:
+                sync_all_accesses(db)
+        except Exception:
+            background_error("web_access_sync")
+            log.exception("web access sync failed")
+        try:
+            await asyncio.wait_for(stop.wait(), timeout=delay)
         except asyncio.TimeoutError:
             pass
 
@@ -100,6 +116,7 @@ async def lifespan(app: FastAPI):
     stop = asyncio.Event()
     tasks = [
         asyncio.create_task(_session_reaper(stop)),
+        asyncio.create_task(_web_access_sync(stop)),
         asyncio.create_task(_node_health_monitor(stop)),
         asyncio.create_task(_peer_reconciler(stop)),
     ]
@@ -135,6 +152,7 @@ app.include_router(rewards.router)
 app.include_router(store.router)
 app.include_router(missions.router)
 app.include_router(vpn.router)
+app.include_router(web_vpn.router)
 app.include_router(users.router)
 app.include_router(payments.router)
 app.include_router(reports.router)

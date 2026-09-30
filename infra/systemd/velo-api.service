@@ -1,6 +1,6 @@
 [Unit]
 Description=Velo API
-After=network-online.target docker.service
+After=network-online.target postgresql.service wg-quick@wg0.service
 Wants=network-online.target
 
 [Service]
