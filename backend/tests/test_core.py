@@ -712,3 +712,38 @@ def test_milestone7_recent_wireguard_handshake_prevents_early_reap(monkeypatch):
         finally:
             settings.vpn_heartbeat_timeout_seconds = old_timeout
             settings.vpn_peer_activity_grace_seconds = old_grace
+
+
+
+def test_admin_can_grant_subscription_by_email_before_login():
+    with TestClient(app) as client:
+        email = 'admin-grant@example.com'
+        grant = client.post(
+            '/v1/admin/subscriptions/grant',
+            headers={'X-Admin-Key': 'pytest-admin'},
+            json={'email': email, 'days': 30, 'note': 'manual sale'},
+        )
+        assert grant.status_code == 200, grant.text
+        assert grant.json()['email'] == email
+
+        token = _login(client, email)
+        sub = client.get('/v1/users/me/subscription', headers=_auth(token))
+        assert sub.status_code == 200, sub.text
+        assert sub.json()['active'] is True
+
+        users = client.get('/v1/admin/users', headers={'X-Admin-Key': 'pytest-admin'}, params={'q': email})
+        assert users.status_code == 200, users.text
+        row = next(x for x in users.json() if x['email'] == email)
+        assert row['subscription_active'] is True
+
+        dashboard = client.get('/v1/admin/dashboard', headers={'X-Admin-Key': 'pytest-admin'})
+        assert dashboard.status_code == 200, dashboard.text
+        assert dashboard.json()['active_subscriptions'] >= 1
+
+        revoke = client.post(
+            f"/v1/admin/users/{row['id']}/subscription/revoke",
+            headers={'X-Admin-Key': 'pytest-admin'},
+        )
+        assert revoke.status_code == 200, revoke.text
+        sub = client.get('/v1/users/me/subscription', headers=_auth(token))
+        assert sub.json()['active'] is False
