@@ -1,4 +1,5 @@
-import { FormEvent, useState } from "react";
+import { useState } from "react";
+import type { FormEvent } from "react";
 import { ApiError, api } from "../../lib/api";
 import { BrandMark } from "../../shared/ui/BrandMark";
 import { useAuth } from "./useAuth";
