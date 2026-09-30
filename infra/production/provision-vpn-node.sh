@@ -9,6 +9,7 @@ CENTRAL_API_IP=""
 CLIENT_CIDR=""
 MAX_SESSIONS="200"
 SSH_PORT="${VELO_SSH_PORT:-}"
+ENABLE_UFW="${VELO_ENABLE_UFW:-false}"
 REPO_REF="${VELO_REPO_REF:-main}"
 
 while [[ $# -gt 0 ]]; do
@@ -21,6 +22,7 @@ while [[ $# -gt 0 ]]; do
     --cidr) CLIENT_CIDR="$2"; shift 2 ;;
     --max-sessions) MAX_SESSIONS="$2"; shift 2 ;;
     --ssh-port) SSH_PORT="$2"; shift 2 ;;
+    --enable-ufw) ENABLE_UFW="true"; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
@@ -91,11 +93,17 @@ EOF
 chown root:velo-agent /etc/velo/node-agent.env
 chmod 640 /etc/velo/node-agent.env
 
-# Preserve management access before enabling the firewall.
+# Stage firewall rules, but do not enable UFW by default during remote provisioning.
+# Enabling a host firewall can drop a live SSH session on some providers/OS releases.
 ufw allow "$SSH_PORT/tcp"
 ufw allow 51820/udp
 ufw allow from "$CENTRAL_API_IP" to any port 8787 proto tcp
-ufw --force enable
+if [[ "$ENABLE_UFW" == "true" ]]; then
+  ufw --force enable
+else
+  echo "UFW rules staged but firewall left inactive for SSH-safe provisioning."
+  echo "After verifying a second SSH login, enable it manually with: ufw --force enable"
+fi
 
 systemctl daemon-reload
 systemctl enable --now wg-quick@wg0
@@ -119,6 +127,7 @@ echo "Tier: premium"
 echo "Max Sessions: $MAX_SESSIONS"
 echo "Agent URL: http://$PUBLIC_IP:8787"
 echo "SSH Port: $SSH_PORT"
+echo "UFW Enabled By Provisioner: $ENABLE_UFW"
 echo "Agent Token is stored at: /etc/velo/node-agent.env"
 echo "============================================================"
 echo
