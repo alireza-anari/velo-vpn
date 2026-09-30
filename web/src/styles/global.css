@@ -386,3 +386,138 @@ button:disabled {
     transition-duration: 0.01ms !important;
   }
 }
+
+
+.vpn-card--wide {
+  grid-column: 1 / -1;
+}
+
+.vpn-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vpn-card__header h2 {
+  margin: 7px 0 0;
+  font-size: clamp(1.3rem, 3vw, 1.8rem);
+}
+
+.vpn-badge {
+  flex: 0 0 auto;
+  padding: 8px 11px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.vpn-badge--active {
+  background: color-mix(in srgb, #20a66a 12%, var(--surface));
+  color: #168356;
+  border-color: color-mix(in srgb, #20a66a 28%, var(--border));
+}
+
+.notice-box {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--primary-soft);
+  color: var(--muted);
+  line-height: 1.8;
+  font-size: 0.88rem;
+}
+
+.vpn-action {
+  width: fit-content;
+  padding-inline: 22px;
+}
+
+.vpn-status-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.vpn-status-grid > div {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 17px;
+  background: var(--surface-soft);
+}
+
+.vpn-status-grid span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.vpn-status-grid strong {
+  font-size: 1rem;
+}
+
+.config-delivery {
+  display: grid;
+  grid-template-columns: minmax(210px, 300px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--surface-soft);
+}
+
+.qr-wrap {
+  aspect-ratio: 1;
+  width: 100%;
+  max-width: 300px;
+  display: grid;
+  place-items: center;
+  padding: 12px;
+  margin-inline: auto;
+  border-radius: 18px;
+  background: white;
+  color: #3d3650;
+}
+
+.qr-wrap img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.config-actions {
+  display: grid;
+  gap: 11px;
+}
+
+.config-actions p {
+  max-width: 620px;
+}
+
+.config-actions button {
+  width: fit-content;
+  padding-inline: 20px;
+}
+
+@media (max-width: 720px) {
+  .vpn-card__header {
+    align-items: center;
+  }
+
+  .vpn-status-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .config-delivery {
+    grid-template-columns: 1fr;
+  }
+
+  .vpn-action,
+  .config-actions button {
+    width: 100%;
+  }
+}
