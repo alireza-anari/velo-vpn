@@ -14,11 +14,15 @@ from .security import decode_subject, verify_admin_session
 bearer = HTTPBearer(auto_error=False)
 
 
-def _subject(credentials: HTTPAuthorizationCredentials | None) -> tuple[str, int]:
-    if not credentials:
+def _subject(
+    credentials: HTTPAuthorizationCredentials | None,
+    web_session: str | None = None,
+) -> tuple[str, int]:
+    token = credentials.credentials if credentials else web_session
+    if not token:
         raise HTTPException(401, "missing_token")
     try:
-        return decode_subject(credentials.credentials)
+        return decode_subject(token)
     except ValueError:
         raise HTTPException(401, "invalid_token")
 
@@ -42,9 +46,10 @@ def current_device(
 
 def current_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    velo_web_session: str | None = Cookie(default=None),
     db: Session = Depends(get_db),
 ) -> User:
-    kind, ident = _subject(credentials)
+    kind, ident = _subject(credentials, velo_web_session)
     if kind != "user":
         raise HTTPException(401, "user_token_required")
     user = db.get(User, ident)
@@ -55,12 +60,14 @@ def current_user(
 
 def optional_user(
     credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+    velo_web_session: str | None = Cookie(default=None),
     db: Session = Depends(get_db),
 ) -> User | None:
-    if not credentials:
+    token = credentials.credentials if credentials else velo_web_session
+    if not token:
         return None
     try:
-        kind, ident = decode_subject(credentials.credentials)
+        kind, ident = decode_subject(token)
     except ValueError:
         return None
     if kind != "user":

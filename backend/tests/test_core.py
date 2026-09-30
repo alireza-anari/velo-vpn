@@ -747,3 +747,28 @@ def test_admin_can_grant_subscription_by_email_before_login():
         assert revoke.status_code == 200, revoke.text
         sub = client.get('/v1/users/me/subscription', headers=_auth(token))
         assert sub.json()['active'] is False
+
+
+def test_web_cookie_session_login_refresh_and_logout():
+    with TestClient(app) as client:
+        email = 'web-user@example.com'
+        r = client.post('/v1/auth/request-otp', json={'email': email})
+        assert r.status_code == 200, r.text
+        code = r.json()['dev_code']
+
+        r = client.post('/v1/auth/verify-otp', json={'email': email, 'code': code})
+        assert r.status_code == 200, r.text
+        assert r.cookies.get('velo_web_session')
+        assert r.json()['access_token']
+
+        # Browser flow authenticates with the HttpOnly cookie and no Authorization header.
+        r = client.get('/v1/auth/me')
+        assert r.status_code == 200, r.text
+        assert r.json()['email'] == email
+
+        r = client.post('/v1/auth/logout')
+        assert r.status_code == 200, r.text
+        assert r.json()['logged_out'] is True
+
+        r = client.get('/v1/auth/me')
+        assert r.status_code == 401
