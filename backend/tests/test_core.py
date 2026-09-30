@@ -772,3 +772,100 @@ def test_web_cookie_session_login_refresh_and_logout():
 
         r = client.get('/v1/auth/me')
         assert r.status_code == 401
+
+
+def test_web_vpn_provision_regenerate_and_expire():
+    from datetime import timedelta
+    from app.db import SessionLocal
+    from app.models import WebVpnAccess
+    from app.services.time_utils import utcnow
+    from app.services.web_vpn import sync_all_accesses
+
+    with TestClient(app) as client:
+        if not client.get('/v1/admin/servers', headers={'X-Admin-Key': 'pytest-admin'}).json():
+            _add_server(client)
+
+        email = 'web-vpn@example.com'
+        token = _login(client, email)
+
+        status = client.get('/v1/web-vpn/access', headers=_auth(token))
+        assert status.status_code == 200, status.text
+        assert status.json()['provisioned'] is False
+        assert status.json()['welcome_available'] is True
+
+        provisioned = client.post('/v1/web-vpn/provision', headers=_auth(token))
+        assert provisioned.status_code == 200, provisioned.text
+        payload = provisioned.json()
+        assert payload['access']['provisioned'] is True
+        assert payload['access']['active'] is True
+        assert payload['access']['remaining_seconds'] > 0
+        assert payload['filename'].endswith('.conf')
+        assert '[Interface]' in payload['configuration']
+        assert 'PrivateKey = ' in payload['configuration']
+        assert '[Peer]' in payload['configuration']
+        assert 'AllowedIPs = 0.0.0.0/0' in payload['configuration']
+        assert provisioned.headers['cache-control'].startswith('no-store')
+
+        duplicate = client.post('/v1/web-vpn/provision', headers=_auth(token))
+        assert duplicate.status_code == 409
+        assert duplicate.json()['detail'] == 'configuration_already_issued'
+
+        with SessionLocal() as db:
+            access = db.query(WebVpnAccess).filter(WebVpnAccess.user_id == payload['access'].get('user_id', -1)).first()
+            if access is None:
+                from app.models import User
+                user = db.query(User).filter(User.email == email).one()
+                access = db.query(WebVpnAccess).filter(WebVpnAccess.user_id == user.id).one()
+            old_key = access.client_public_key
+            old_ip = access.client_ip
+            old_until = access.free_until
+            old_version = access.config_version
+
+        regenerated = client.post('/v1/web-vpn/regenerate', headers=_auth(token))
+        assert regenerated.status_code == 200, regenerated.text
+        assert regenerated.json()['access']['config_version'] == old_version + 1
+
+        with SessionLocal() as db:
+            from app.models import User
+            user = db.query(User).filter(User.email == email).one()
+            access = db.query(WebVpnAccess).filter(WebVpnAccess.user_id == user.id).one()
+            assert access.client_public_key != old_key
+            assert access.client_ip == old_ip
+            assert access.free_until == old_until
+            assert access.welcome_granted_at is not None
+            access.free_until = utcnow() - timedelta(seconds=1)
+            access.peer_enabled = True
+            db.commit()
+
+        with SessionLocal() as db:
+            result = sync_all_accesses(db)
+            assert result['checked'] >= 1
+
+        expired = client.get('/v1/web-vpn/access', headers=_auth(token))
+        assert expired.status_code == 200
+        assert expired.json()['active'] is False
+        assert expired.json()['remaining_seconds'] == 0
+
+
+def test_web_vpn_reserves_distinct_client_ips():
+    from app.db import SessionLocal
+    from app.models import User, WebVpnAccess
+
+    with TestClient(app) as client:
+        if not client.get('/v1/admin/servers', headers={'X-Admin-Key': 'pytest-admin'}).json():
+            _add_server(client)
+
+        first = _login(client, 'web-ip-a@example.com')
+        r = client.post('/v1/web-vpn/provision', headers=_auth(first))
+        assert r.status_code == 200, r.text
+
+        second = _login(client, 'web-ip-b@example.com')
+        r = client.post('/v1/web-vpn/provision', headers=_auth(second))
+        assert r.status_code == 200, r.text
+
+        with SessionLocal() as db:
+            a = db.query(User).filter(User.email == 'web-ip-a@example.com').one()
+            b = db.query(User).filter(User.email == 'web-ip-b@example.com').one()
+            aa = db.query(WebVpnAccess).filter(WebVpnAccess.user_id == a.id).one()
+            bb = db.query(WebVpnAccess).filter(WebVpnAccess.user_id == b.id).one()
+            assert aa.client_ip != bb.client_ip
