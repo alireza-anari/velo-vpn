@@ -149,6 +149,8 @@ def issue_config(db: Session, user: User, replace: bool = False) -> tuple[dict, 
     is_new = access is None
     old_key: str | None = None
     old_enabled = False
+    old_server: VpnServer | None = None
+    old_ip: str | None = None
     private_key, public_key = generate_keypair()
 
     if is_new:
@@ -176,21 +178,23 @@ def issue_config(db: Session, user: User, replace: bool = False) -> tuple[dict, 
             access.client_ip = allocate_client_ip(db, server)
         old_key = access.client_public_key
         old_enabled = bool(access.peer_enabled)
+        old_server = server
+        old_ip = access.client_ip
         access.config_version = int(access.config_version or 0) + 1
 
     until, premium = effective_access_until(db, access)
     entitled = until is not None
 
-    if old_key and old_enabled:
-        remove_peer(server, old_key, access.client_ip)
+    if old_key and old_enabled and old_server and old_ip:
+        remove_peer(old_server, old_key, old_ip)
 
     try:
         if entitled:
             add_peer(server, public_key, access.client_ip, None if premium else _free_speed(db))
     except Exception:
-        if old_key and old_enabled:
+        if old_key and old_enabled and old_server and old_ip:
             try:
-                add_peer(server, old_key, access.client_ip, None if premium else _free_speed(db))
+                add_peer(old_server, old_key, old_ip, None if premium else _free_speed(db))
             except Exception:
                 pass
         db.rollback()
