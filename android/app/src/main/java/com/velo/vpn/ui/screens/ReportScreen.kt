@@ -16,7 +16,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
-import com.velo.vpn.ui.AccountViewModel
 import com.velo.vpn.ui.ReportViewModel
 import com.velo.vpn.ui.Routes
 import com.velo.vpn.ui.components.VeloBottomBar
@@ -28,29 +27,28 @@ import com.velo.vpn.ui.theme.VeloPurple
 import kotlin.math.max
 
 @Composable
-fun ReportScreen(nav: NavHostController, vm: ReportViewModel, accountVm: AccountViewModel) {
+fun ReportScreen(nav: NavHostController, vm: ReportViewModel) {
     val state by vm.state.collectAsState()
-    val account by accountVm.state.collectAsState()
     val report = state.report
     Scaffold(bottomBar = { VeloBottomBar(nav, Routes.Report) }) { pad ->
         Column(
-            Modifier.fillMaxSize().padding(pad).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            Modifier.fillMaxSize().padding(pad).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            VeloHeader(hearts = account.hearts)
-            Text("گزارش", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+            VeloHeader()
+            Text("مصرف", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
             state.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                ReportStat(formatBytes((report?.todayRxBytes ?: 0) + (report?.todayTxBytes ?: 0)), "", "حجم مصرف", Icons.Default.Download, Modifier.weight(1f))
-                ReportStat(formatDuration(report?.todaySeconds ?: 0), "", "زمان استفاده", Icons.Default.Schedule, Modifier.weight(1f))
-                ReportStat((report?.todayConnections ?: 0).toString(), "بار", "تعداد اتصال", Icons.Default.Link, Modifier.weight(1f))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                ReportStat(formatBytes((report?.todayRxBytes ?: 0) + (report?.todayTxBytes ?: 0)), "امروز", Icons.Default.Download, Modifier.weight(1f))
+                ReportStat(formatDuration(report?.todaySeconds ?: 0), "زمان امروز", Icons.Default.Schedule, Modifier.weight(1f))
+                ReportStat((report?.todayConnections ?: 0).toString(), "اتصال", Icons.Default.Link, Modifier.weight(1f))
             }
 
             VeloCard(Modifier.fillMaxWidth()) {
-                Text("مصرف ۷ روز گذشته", fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                Spacer(Modifier.height(20.dp))
+                Text("۷ روز گذشته", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                Spacer(Modifier.height(18.dp))
                 val days = report?.last7Days.orEmpty()
                 val values = if (days.isEmpty()) List(7) { 0L } else days.map { it.bytes }
                 val peak = max(1L, values.maxOrNull() ?: 1L)
@@ -96,12 +94,11 @@ fun ReportScreen(nav: NavHostController, vm: ReportViewModel, accountVm: Account
 }
 
 @Composable
-private fun ReportStat(value: String, unit: String, label: String, icon: ImageVector, modifier: Modifier) {
+private fun ReportStat(value: String, label: String, icon: ImageVector, modifier: Modifier) {
     VeloCard(modifier) {
         Icon(icon, null, tint = VeloPurple)
         Spacer(Modifier.height(10.dp))
-        Text(value, fontSize = 19.sp, fontWeight = FontWeight.Bold)
-        if (unit.isNotBlank()) Text(unit, fontSize = 10.sp, color = Muted)
+        Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         Text(label, fontSize = 10.sp, color = Muted)
     }
 }
@@ -115,5 +112,5 @@ private fun formatBytes(bytes: Long): String {
 private fun formatDuration(seconds: Int): String {
     val h = seconds / 3600
     val m = (seconds % 3600) / 60
-    return if (h > 0) "${h}س ${m}د" else "${m} دقیقه"
+    return if (h > 0) h.toString() + "س " + m.toString() + "د" else m.toString() + " دقیقه"
 }
