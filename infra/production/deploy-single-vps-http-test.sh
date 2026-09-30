@@ -29,7 +29,6 @@ apt-get install -y   git rsync nginx postgresql postgresql-client   python3-venv
 
 id velo >/dev/null 2>&1 || useradd --system --create-home --shell /usr/sbin/nologin velo
 install -d -m 755 /opt/velo "$SOURCE_DIR" "$BACKEND_DIR" "$WEB_ROOT"
-install -d -m 700 /etc/velo
 install -d -m 755 -o velo -g velo "$BACKEND_DIR/uploads"
 
 # Fetch exactly the requested ref. This works with branches/tags and keeps deployment repeatable.
