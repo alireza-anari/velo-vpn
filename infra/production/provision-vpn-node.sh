@@ -8,6 +8,7 @@ PUBLIC_IP=""
 CENTRAL_API_IP=""
 CLIENT_CIDR=""
 MAX_SESSIONS="200"
+SSH_PORT="${VELO_SSH_PORT:-}"
 REPO_REF="${VELO_REPO_REF:-main}"
 
 while [[ $# -gt 0 ]]; do
@@ -19,14 +20,24 @@ while [[ $# -gt 0 ]]; do
     --central-api-ip) CENTRAL_API_IP="$2"; shift 2 ;;
     --cidr) CLIENT_CIDR="$2"; shift 2 ;;
     --max-sessions) MAX_SESSIONS="$2"; shift 2 ;;
+    --ssh-port) SSH_PORT="$2"; shift 2 ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
   esac
 done
 
 [[ $EUID -eq 0 ]] || { echo "run with sudo/root" >&2; exit 2; }
 for v in NAME COUNTRY CITY PUBLIC_IP CENTRAL_API_IP CLIENT_CIDR; do
-  [[ -n "${!v}" ]] || { echo "missing --${v,,}" >&2; exit 2; }
+  [[ -n "${!v}" ]] || { echo "missing required argument for $v" >&2; exit 2; }
 done
+
+if [[ -z "$SSH_PORT" ]]; then
+  SSH_PORT="$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}')"
+fi
+SSH_PORT="${SSH_PORT:-22}"
+[[ "$SSH_PORT" =~ ^[0-9]+$ ]] && (( SSH_PORT >= 1 && SSH_PORT <= 65535 )) || {
+  echo "invalid SSH port: $SSH_PORT" >&2
+  exit 2
+}
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
@@ -65,7 +76,11 @@ PY
 
 WG_ADDRESS="$WG_ADDRESS" WG_CLIENT_CIDR="$CLIENT_CIDR" WG_PORT=51820 /opt/velo/wireguard/install.sh
 
-AGENT_TOKEN="$(openssl rand -hex 32)"
+if [[ -f /etc/velo/node-agent.env ]] && grep -q '^VELO_AGENT_KEY=' /etc/velo/node-agent.env; then
+  AGENT_TOKEN="$(sed -n 's/^VELO_AGENT_KEY=//p' /etc/velo/node-agent.env | head -n1)"
+else
+  AGENT_TOKEN="$(openssl rand -hex 32)"
+fi
 cat >/etc/velo/node-agent.env <<EOF
 VELO_AGENT_KEY=$AGENT_TOKEN
 WIREGUARD_INTERFACE=wg0
@@ -76,6 +91,8 @@ EOF
 chown root:velo-agent /etc/velo/node-agent.env
 chmod 640 /etc/velo/node-agent.env
 
+# Preserve management access before enabling the firewall.
+ufw allow "$SSH_PORT/tcp"
 ufw allow 51820/udp
 ufw allow from "$CENTRAL_API_IP" to any port 8787 proto tcp
 ufw --force enable
@@ -101,7 +118,8 @@ echo "Client CIDR: $CLIENT_CIDR"
 echo "Tier: premium"
 echo "Max Sessions: $MAX_SESSIONS"
 echo "Agent URL: http://$PUBLIC_IP:8787"
-echo "Agent Token: $AGENT_TOKEN"
+echo "SSH Port: $SSH_PORT"
+echo "Agent Token is stored at: /etc/velo/node-agent.env"
 echo "============================================================"
 echo
-echo "Keep Agent Token private. It grants node-control access."
+echo "Keep /etc/velo/node-agent.env private. The token grants node-control access."
