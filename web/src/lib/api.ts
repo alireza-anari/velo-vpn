@@ -11,21 +11,23 @@ export class ApiError extends Error {
 }
 
 type JsonValue = Record<string, unknown> | unknown[] | string | number | boolean | null;
+type ApiRequestInit = RequestInit & { json?: JsonValue };
 
 export async function api<T>(
   path: string,
-  init: RequestInit & { json?: JsonValue } = {},
+  init: ApiRequestInit = {},
 ): Promise<T> {
-  const headers = new Headers(init.headers);
-  let body = init.body;
+  const { json, ...requestInit } = init;
+  const headers = new Headers(requestInit.headers);
+  let body: BodyInit | null = requestInit.body ?? null;
 
-  if (init.json !== undefined) {
+  if (json !== undefined) {
     headers.set("Content-Type", "application/json");
-    body = JSON.stringify(init.json);
+    body = JSON.stringify(json);
   }
 
   const response = await fetch(path, {
-    ...init,
+    ...requestInit,
     body,
     headers,
     credentials: "same-origin",
