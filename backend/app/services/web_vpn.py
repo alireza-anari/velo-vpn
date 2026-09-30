@@ -149,6 +149,7 @@ def issue_config(db: Session, user: User, replace: bool = False) -> tuple[dict, 
     is_new = access is None
     old_key: str | None = None
     old_enabled = False
+    private_key, public_key = generate_keypair()
 
     if is_new:
         server = _choose_server_for_user(db, user)
@@ -156,7 +157,7 @@ def issue_config(db: Session, user: User, replace: bool = False) -> tuple[dict, 
         access = WebVpnAccess(
             user_id=user.id,
             server_id=server.id,
-            client_public_key="pending",
+            client_public_key=public_key,
             client_ip=client_ip,
             peer_enabled=False,
             config_version=1,
@@ -177,7 +178,6 @@ def issue_config(db: Session, user: User, replace: bool = False) -> tuple[dict, 
         old_enabled = bool(access.peer_enabled)
         access.config_version = int(access.config_version or 0) + 1
 
-    private_key, public_key = generate_keypair()
     until, premium = effective_access_until(db, access)
     entitled = until is not None
 
