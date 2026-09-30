@@ -8,6 +8,7 @@ PUBLIC_IP=""
 CENTRAL_API_IP=""
 CLIENT_CIDR=""
 MAX_SESSIONS="200"
+TIER="${VELO_NODE_TIER:-free}"
 SSH_PORT="${VELO_SSH_PORT:-}"
 ENABLE_UFW="${VELO_ENABLE_UFW:-false}"
 REPO_REF="${VELO_REPO_REF:-main}"
@@ -21,6 +22,7 @@ while [[ $# -gt 0 ]]; do
     --central-api-ip) CENTRAL_API_IP="$2"; shift 2 ;;
     --cidr) CLIENT_CIDR="$2"; shift 2 ;;
     --max-sessions) MAX_SESSIONS="$2"; shift 2 ;;
+    --tier) TIER="$2"; shift 2 ;;
     --ssh-port) SSH_PORT="$2"; shift 2 ;;
     --enable-ufw) ENABLE_UFW="true"; shift ;;
     *) echo "unknown argument: $1" >&2; exit 2 ;;
@@ -35,6 +37,11 @@ done
 if [[ -z "$SSH_PORT" ]]; then
   SSH_PORT="$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}')"
 fi
+case "$TIER" in
+  free|premium|vip) ;;
+  *) echo "invalid tier: $TIER (expected free|premium|vip)" >&2; exit 2 ;;
+esac
+
 SSH_PORT="${SSH_PORT:-22}"
 [[ "$SSH_PORT" =~ ^[0-9]+$ ]] && (( SSH_PORT >= 1 && SSH_PORT <= 65535 )) || {
   echo "invalid SSH port: $SSH_PORT" >&2
@@ -123,7 +130,7 @@ echo "Endpoint Host: $PUBLIC_IP"
 echo "Endpoint Port: 51820"
 echo "Public Key: $PUBKEY"
 echo "Client CIDR: $CLIENT_CIDR"
-echo "Tier: premium"
+echo "Tier: $TIER"
 echo "Max Sessions: $MAX_SESSIONS"
 echo "Agent URL: http://$PUBLIC_IP:8787"
 echo "SSH Port: $SSH_PORT"
