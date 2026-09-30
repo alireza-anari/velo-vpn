@@ -4,7 +4,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.WorkspacePremium
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,10 +14,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavHostController
 import com.velo.vpn.ui.AccountViewModel
+import com.velo.vpn.ui.Routes
 import com.velo.vpn.ui.components.PrimaryButton
+import com.velo.vpn.ui.components.VeloBottomBar
 import com.velo.vpn.ui.components.VeloCard
 import com.velo.vpn.ui.components.VeloHeader
-import com.velo.vpn.ui.theme.HeartPink
 import com.velo.vpn.ui.theme.Muted
 import com.velo.vpn.ui.theme.VeloPurple
 
@@ -28,13 +28,13 @@ fun AccountScreen(nav: NavHostController, vm: AccountViewModel) {
     var email by remember { mutableStateOf("") }
     var code by remember { mutableStateOf("") }
 
-    Scaffold { pad ->
+    Scaffold(bottomBar = { VeloBottomBar(nav, Routes.Account) }) { pad ->
         Column(
-            Modifier.fillMaxSize().padding(pad).padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp),
+            Modifier.fillMaxSize().padding(pad).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            VeloHeader(showBack = true, hearts = state.hearts, onBack = { nav.popBackStack() })
-            Text("حساب کاربری", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+            VeloHeader()
+            Text("حساب", fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
 
             if (state.loading) LinearProgressIndicator(Modifier.fillMaxWidth())
 
@@ -42,28 +42,24 @@ fun AccountScreen(nav: NavHostController, vm: AccountViewModel) {
                 VeloCard(Modifier.fillMaxWidth()) {
                     Text("ایمیل", color = Muted, fontSize = 12.sp)
                     Text(state.email, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                    Spacer(Modifier.height(14.dp))
-                    Row(Modifier.fillMaxWidth()) {
-                        Column(Modifier.weight(1f)) {
-                            Icon(Icons.Default.Favorite, null, tint = HeartPink)
-                            Text("${state.hearts} قلب", fontWeight = FontWeight.Bold)
-                        }
-                        Column(Modifier.weight(1f)) {
-                            Icon(Icons.Default.WorkspacePremium, null, tint = VeloPurple)
-                            Text(if (state.subscriptionActive) "Premium فعال" else "پلن رایگان", fontWeight = FontWeight.Bold)
-                            state.subscriptionEndsAt?.let { endsAt ->
-                                Text(
-                                    endsAt.take(10),
-                                    color = Muted,
-                                    fontSize = 11.sp
-                                )
-                            }
+                    Spacer(Modifier.height(18.dp))
+                    Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+                        Icon(Icons.Default.WorkspacePremium, null, tint = VeloPurple)
+                        Spacer(Modifier.width(10.dp))
+                        Column {
+                            Text(if (state.subscriptionActive) "اشتراک پریمیوم فعال" else "اشتراک فعال ندارید", fontWeight = FontWeight.Bold)
+                            state.subscriptionEndsAt?.let { Text("تا " + it.take(10), color = Muted, fontSize = 11.sp) }
                         }
                     }
                 }
-                OutlinedButton(onClick = { vm.logout() }, modifier = Modifier.fillMaxWidth()) { Text("خروج از حساب") }
+
+                if (!state.subscriptionActive) {
+                    PrimaryButton("خرید اشتراک") { nav.navigate(Routes.Premium) }
+                }
+                OutlinedButton(onClick = { vm.refresh() }, modifier = Modifier.fillMaxWidth()) { Text("بروزرسانی وضعیت اشتراک") }
+                TextButton(onClick = { vm.logout() }, modifier = Modifier.fillMaxWidth()) { Text("خروج از حساب") }
             } else if (!state.otpSent) {
-                Text("فقط زمانی که می‌خواهید خرید، قلب‌ها یا دعوت‌ها محفوظ بمانند به حساب نیاز دارید.", color = Muted)
+                Text("برای خرید و استفاده از اشتراک پریمیوم با ایمیل وارد شوید.", color = Muted)
                 OutlinedTextField(
                     value = email,
                     onValueChange = { email = it },
@@ -75,7 +71,7 @@ fun AccountScreen(nav: NavHostController, vm: AccountViewModel) {
                 )
                 PrimaryButton("ارسال کد ورود") { vm.requestOtp(email) }
             } else {
-                Text("کد ۶ رقمی ارسال‌شده به ${state.pendingEmail} را وارد کنید.", color = Muted)
+                Text("کد ۶ رقمی ارسال‌شده به " + state.pendingEmail + " را وارد کنید.", color = Muted)
                 OutlinedTextField(
                     value = code,
                     onValueChange = { code = it.filter(Char::isDigit).take(6) },
@@ -84,8 +80,8 @@ fun AccountScreen(nav: NavHostController, vm: AccountViewModel) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
                     singleLine = true,
                 )
-                if (state.devCode != null) Text("کد توسعه: ${state.devCode}", color = Muted, fontSize = 11.sp)
-                PrimaryButton("ورود به Velo") { vm.verifyOtp(code) { nav.popBackStack() } }
+                if (state.devCode != null) Text("کد توسعه: " + state.devCode, color = Muted, fontSize = 11.sp)
+                PrimaryButton("ورود") { vm.verifyOtp(code) { nav.navigate(Routes.Home) { popUpTo(Routes.Home) { inclusive = false } } } }
                 TextButton(onClick = { vm.clearNotice(); vm.requestOtp(state.pendingEmail) }) { Text("ارسال دوباره کد") }
             }
 

@@ -33,25 +33,19 @@ fun VeloApp() {
     val app = LocalContext.current.applicationContext as VeloApplication
     val veloViewModel: VeloViewModel = viewModel(factory = VeloViewModel.Factory(app.container))
     val accountViewModel: AccountViewModel = viewModel(factory = AccountViewModel.Factory(app.container))
-    val rewardsViewModel: RewardsViewModel = viewModel(factory = RewardsViewModel.Factory(app.container))
     val commerceViewModel: CommerceViewModel = viewModel(factory = CommerceViewModel.Factory(app.container))
-    val storeViewModel: StoreViewModel = viewModel(factory = StoreViewModel.Factory(app.container))
 
+    // Premium-first MVP: only login/account, one-tap connection, subscription purchase
+    // and usage reporting are exposed. Rewards, missions, referrals, store and manual
+    // server selection remain in the project for later product phases.
     NavHost(navController = nav, startDestination = Routes.Home) {
         composable(Routes.Home) { HomeScreen(nav, veloViewModel, accountViewModel) }
-        composable(Routes.Gifts) { GiftsScreen(nav, accountViewModel) }
         composable(Routes.Report) {
             val reportVm: ReportViewModel = viewModel(factory = ReportViewModel.Factory(app.container))
-            ReportScreen(nav, reportVm, accountViewModel)
+            ReportScreen(nav, reportVm)
         }
-        composable(Routes.Settings) { SettingsScreen(nav, accountViewModel) }
         composable(Routes.Account) { AccountScreen(nav, accountViewModel) }
         composable(Routes.Premium) { PremiumScreen(nav, commerceViewModel, accountViewModel) }
-        composable(Routes.Servers) { ServerScreen(nav, veloViewModel) }
-        composable(Routes.Missions) { MissionsScreen(nav, rewardsViewModel, accountViewModel) }
-        composable(Routes.Referral) { ReferralScreen(nav, rewardsViewModel, accountViewModel) }
-        composable(Routes.Support) { SupportScreen(nav, commerceViewModel, accountViewModel) }
-        composable(Routes.Store) { StoreScreen(nav, storeViewModel, accountViewModel, veloViewModel) }
         composable(
             Routes.Payment,
             arguments = listOf(
@@ -62,7 +56,7 @@ fun VeloApp() {
         ) {
             ManualPaymentScreen(
                 nav = nav,
-                kind = it.arguments?.getString("kind") ?: "support",
+                kind = it.arguments?.getString("kind") ?: "premium",
                 planCode = it.arguments?.getString("plan")?.ifBlank { null },
                 baseAmount = it.arguments?.getInt("amount") ?: 0,
                 commerce = commerceViewModel,

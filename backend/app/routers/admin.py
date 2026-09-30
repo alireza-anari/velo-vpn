@@ -4,13 +4,14 @@ from datetime import timedelta
 from pathlib import Path
 
 from fastapi import APIRouter, Body, Depends, HTTPException
+from pydantic import BaseModel, EmailStr, Field
 from fastapi.responses import FileResponse
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..deps import require_admin
-from ..models import AdminAuditLog, HeartLedger, ManualPayment, Subscription, User, VpnServer
+from ..models import AdminAuditLog, Device, HeartLedger, ManualPayment, Subscription, User, VpnServer, VpnSession
 from ..schemas import AdminPaymentReview, AdminServerIn
 from ..services.settings_store import get_json, set_json
 from ..services.emailer import send_email
@@ -160,26 +161,44 @@ def settings_put(key: str, value=Body(...), db: Session = Depends(get_db)):
 @router.get("/servers")
 def servers(db: Session = Depends(get_db)):
     rows = db.scalars(select(VpnServer).order_by(VpnServer.id.asc())).all()
-    return [
-        {
-            "id": s.id,
-            "name": s.name,
-            "country_code": s.country_code,
-            "city": s.city,
-            "endpoint": f"{s.endpoint_host}:{s.endpoint_port}",
-            "tier": s.tier,
-            "active": s.is_active,
-            "default": s.is_default,
-            "max_sessions": s.max_sessions,
-            "agent_configured": bool(s.agent_url),
-            "health_state": s.health_state,
-            "health_failures": s.health_failures,
-            "last_health_at": s.last_health_at,
-            "last_health_error": s.last_health_error,
-            "unhealthy_until": s.unhealthy_until,
-        }
-        for s in rows
-    ]
+    out = []
+    for server in rows:
+        active_sessions = int(db.scalar(
+            select(func.count(VpnSession.id)).where(
+                VpnSession.server_id == server.id,
+                VpnSession.status == "active",
+            )
+        ) or 0)
+        usage = db.execute(
+            select(
+                func.coalesce(func.sum(VpnSession.rx_bytes + VpnSession.tx_bytes), 0),
+                func.coalesce(func.sum(VpnSession.consumed_seconds), 0),
+            ).where(VpnSession.server_id == server.id)
+        ).one()
+        out.append({
+            "id": server.id,
+            "name": server.name,
+            "country_code": server.country_code,
+            "city": server.city,
+            "endpoint": f"{server.endpoint_host}:{server.endpoint_port}",
+            "client_cidr": server.client_cidr,
+            "tier": server.tier,
+            "active": server.is_active,
+            "default": server.is_default,
+            "max_sessions": server.max_sessions,
+            "active_sessions": active_sessions,
+            "utilization_percent": round((active_sessions / max(1, server.max_sessions)) * 100, 1),
+            "usage_bytes": int(usage[0] or 0),
+            "usage_seconds": int(usage[1] or 0),
+            "agent_configured": bool(server.agent_url),
+            "agent_url": server.agent_url,
+            "health_state": server.health_state,
+            "health_failures": server.health_failures,
+            "last_health_at": server.last_health_at,
+            "last_health_error": server.last_health_error,
+            "unhealthy_until": server.unhealthy_until,
+        })
+    return out
 
 
 @router.post("/servers")
@@ -260,3 +279,142 @@ def audit_log(limit: int = 100, db: Session = Depends(get_db)):
         }
         for r in rows
     ]
+
+
+class AdminSubscriptionGrantIn(BaseModel):
+    email: EmailStr
+    days: int = Field(ge=1, le=730)
+    note: str | None = Field(default=None, max_length=500)
+
+
+@router.get("/dashboard")
+def dashboard(db: Session = Depends(get_db)):
+    now = utcnow()
+    return {
+        "users": int(db.scalar(select(func.count(User.id))) or 0),
+        "active_subscriptions": int(db.scalar(select(func.count(Subscription.id)).where(Subscription.ends_at > now)) or 0),
+        "active_sessions": int(db.scalar(select(func.count(VpnSession.id)).where(VpnSession.status == "active")) or 0),
+        "pending_payments": int(db.scalar(select(func.count(ManualPayment.id)).where(ManualPayment.status == "pending")) or 0),
+        "active_servers": int(db.scalar(select(func.count(VpnServer.id)).where(VpnServer.is_active == True)) or 0),  # noqa: E712
+        "total_servers": int(db.scalar(select(func.count(VpnServer.id))) or 0),
+    }
+
+
+@router.get("/users")
+def users(q: str | None = None, limit: int = 100, db: Session = Depends(get_db)):
+    limit = max(1, min(int(limit), 300))
+    stmt = select(User).order_by(User.id.desc()).limit(limit)
+    if q:
+        stmt = stmt.where(User.email.ilike("%" + q.strip() + "%"))
+    rows = db.scalars(stmt).all()
+    out = []
+    now = utcnow()
+    for user in rows:
+        sub = active_subscription(db, user.id)
+        device_count = int(db.scalar(select(func.count(Device.id)).where(Device.user_id == user.id)) or 0)
+        active_sessions = int(db.scalar(select(func.count(VpnSession.id)).where(VpnSession.user_id == user.id, VpnSession.status == "active")) or 0)
+        usage = db.execute(
+            select(
+                func.coalesce(func.sum(VpnSession.rx_bytes + VpnSession.tx_bytes), 0),
+                func.coalesce(func.sum(VpnSession.consumed_seconds), 0),
+            ).where(VpnSession.user_id == user.id)
+        ).one()
+        out.append({
+            "id": user.id,
+            "email": user.email,
+            "active": user.is_active,
+            "subscription_active": bool(sub and as_utc(sub.ends_at) > now),
+            "subscription_ends_at": sub.ends_at if sub else None,
+            "devices": device_count,
+            "active_sessions": active_sessions,
+            "usage_bytes": int(usage[0] or 0),
+            "usage_seconds": int(usage[1] or 0),
+            "created_at": user.created_at,
+        })
+    return out
+
+
+@router.post("/subscriptions/grant")
+def grant_subscription(payload: AdminSubscriptionGrantIn, db: Session = Depends(get_db)):
+    email = str(payload.email).strip().lower()
+    user = db.scalar(select(User).where(User.email == email))
+    if not user:
+        user = User(email=email)
+        db.add(user)
+        db.flush()
+    current = active_subscription(db, user.id)
+    start = utcnow()
+    current_end = as_utc(current.ends_at) if current else None
+    base = current_end if current_end and current_end > start else start
+    sub = Subscription(
+        user_id=user.id,
+        starts_at=start,
+        ends_at=base + timedelta(days=payload.days),
+        source="admin_manual",
+    )
+    db.add(sub)
+    _audit(db, "subscription_grant", "user", user.id, f"email={email};days={payload.days};note={payload.note or ''}")
+    db.commit()
+    db.refresh(sub)
+    send_email(email, "Velo: اشتراک شما فعال شد", f"اشتراک Velo شما برای {payload.days} روز فعال شد.\nاعتبار تا: {sub.ends_at}")
+    return {"user_id": user.id, "email": email, "ends_at": sub.ends_at}
+
+
+@router.post("/users/{user_id}/subscription/revoke")
+def revoke_subscription(user_id: int, db: Session = Depends(get_db)):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(404, "user_not_found")
+    now = utcnow()
+    rows = db.scalars(select(Subscription).where(Subscription.user_id == user_id, Subscription.ends_at > now)).all()
+    for row in rows:
+        row.ends_at = now
+    sessions = db.scalars(select(VpnSession).where(VpnSession.user_id == user_id, VpnSession.status == "active")).all()
+    from ..services.vpn import close_session
+    for session in sessions:
+        close_session(db, session, "subscription_revoked")
+    _audit(db, "subscription_revoke", "user", user.id, user.email)
+    db.commit()
+    return {"user_id": user.id, "revoked": len(rows)}
+
+
+@router.post("/users/{user_id}/toggle")
+def toggle_user(user_id: int, db: Session = Depends(get_db)):
+    user = db.get(User, user_id)
+    if not user:
+        raise HTTPException(404, "user_not_found")
+    user.is_active = not user.is_active
+    if not user.is_active:
+        from ..services.vpn import close_session
+        sessions = db.scalars(select(VpnSession).where(VpnSession.user_id == user_id, VpnSession.status == "active")).all()
+        for session in sessions:
+            close_session(db, session, "user_disabled")
+    _audit(db, "user_toggle", "user", user.id, f"active={user.is_active}")
+    db.commit()
+    return {"user_id": user.id, "active": user.is_active}
+
+
+@router.get("/sessions")
+def sessions(status: str = "active", limit: int = 200, db: Session = Depends(get_db)):
+    limit = max(1, min(int(limit), 500))
+    stmt = select(VpnSession).order_by(VpnSession.id.desc()).limit(limit)
+    if status:
+        stmt = stmt.where(VpnSession.status == status)
+    rows = db.scalars(stmt).all()
+    out = []
+    for row in rows:
+        user = db.get(User, row.user_id) if row.user_id else None
+        server = db.get(VpnServer, row.server_id)
+        out.append({
+            "id": row.id,
+            "email": user.email if user else None,
+            "server": server.name if server else str(row.server_id),
+            "client_ip": row.client_ip,
+            "premium": row.is_premium,
+            "status": row.status,
+            "started_at": row.started_at,
+            "last_heartbeat_at": row.last_heartbeat_at,
+            "rx_bytes": row.rx_bytes,
+            "tx_bytes": row.tx_bytes,
+        })
+    return out
