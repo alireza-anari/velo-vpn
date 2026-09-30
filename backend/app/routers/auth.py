@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 import secrets
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select, func
 from sqlalchemy.orm import Session
 
@@ -65,7 +65,7 @@ def request_otp(payload: OtpRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/auth/verify-otp")
-def verify_otp(payload: OtpVerify, db: Session = Depends(get_db)):
+def verify_otp(payload: OtpVerify, response: Response, db: Session = Depends(get_db)):
     email = payload.email.lower()
     row = db.scalar(
         select(OtpCode)
@@ -82,8 +82,18 @@ def verify_otp(payload: OtpVerify, db: Session = Depends(get_db)):
         db.flush()
     db.commit()
     ensure_referral_code(db, user)
+    access_token = token_for_user(user.id)
+    response.set_cookie(
+        key="velo_web_session",
+        value=access_token,
+        max_age=30 * 86400,
+        httponly=True,
+        secure=settings.environment.lower() == "production",
+        samesite="lax",
+        path="/",
+    )
     return {
-        "access_token": token_for_user(user.id),
+        "access_token": access_token,
         "user_id": user.id,
         "email": user.email,
         "referral_code": user.referral_code,
@@ -131,3 +141,15 @@ def unlink_device(payload: LinkDevice, user: User = Depends(current_user), db: S
 def me(user: User = Depends(current_user), db: Session = Depends(get_db)):
     ensure_referral_code(db, user)
     return {"id": user.id, "email": user.email, "referral_code": user.referral_code}
+
+
+@router.post("/auth/logout")
+def logout(response: Response):
+    response.delete_cookie(
+        key="velo_web_session",
+        httponly=True,
+        secure=settings.environment.lower() == "production",
+        samesite="lax",
+        path="/",
+    )
+    return {"logged_out": True}
