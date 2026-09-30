@@ -1,6 +1,7 @@
 import { BrandMark } from "../../shared/ui/BrandMark";
 import { ThemeToggle } from "../../shared/ui/ThemeToggle";
 import { useAuth } from "../auth/useAuth";
+import { VpnAccessPanel } from "../vpn/VpnAccessPanel";
 
 export function DashboardPage() {
   const { user, logout } = useAuth();
@@ -20,16 +21,18 @@ export function DashboardPage() {
 
       <section className="dashboard-grid">
         <article className="hero-card">
-          <span className="eyebrow">مرحله ۱</span>
-          <h1>حساب شما آماده است</h1>
+          <span className="eyebrow">Velo Web</span>
+          <h1>کانفیگ شخصی، بدون نصب اپ Velo</h1>
           <p>
-            پایه وب Velo فعال شده است. در مرحله بعد، کانفیگ اختصاصی WireGuard و ۱۵ دقیقه هدیه شروع به همین حساب متصل می‌شود.
+            کانفیگ اختصاصی WireGuard را از همین پنل می‌گیری. در نسخه فعلی هر حساب فقط یک کانفیگ فعال دارد و ساخت کانفیگ جدید، قبلی را باطل می‌کند.
           </p>
           <div className="status-chip">
             <span className="status-dot" />
-            ورود امن فعال
+            حساب امن و آماده
           </div>
         </article>
+
+        <VpnAccessPanel />
 
         <article className="panel-card">
           <span className="panel-label">حساب</span>
@@ -41,9 +44,11 @@ export function DashboardPage() {
         </article>
 
         <article className="panel-card muted-card">
-          <span className="panel-label">دسترسی VPN</span>
-          <strong>در مرحله بعد</strong>
-          <p>QR، فایل WireGuard، اعتبار رایگان و انتخاب Node بعد از تکمیل هسته دسترسی اضافه می‌شوند.</p>
+          <span className="panel-label">مرحله بعد</span>
+          <strong>شارژ رایگان با تبلیغ</strong>
+          <p>
+            بعد از نهایی‌شدن صدور کانفیگ و تست روی Node خارجی، اعتبار تبلیغاتی و Premium به همین دسترسی اضافه می‌شوند.
+          </p>
         </article>
       </section>
     </main>
